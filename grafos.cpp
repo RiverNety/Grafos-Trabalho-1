@@ -3,6 +3,7 @@
 #include <fstream>
 #include <cstdio>
 #include <queue>
+#include <stack>
 
 using namespace std;
 
@@ -85,6 +86,31 @@ void dfs(int v){
     for (int u : vetor_adj[v]){
         if (!visitados[u]){
             dfs(u);
+        }
+    }
+}
+
+//dfs iterativa
+void dfs_iterativa(int v){
+    
+    restart_visitados();
+    restart_pai();
+
+    stack<int> pilha;
+    pilha.push(v);
+    visitados[v] = true;
+    pai[v] = -1;
+
+    while (!pilha.empty()){
+        v = pilha.top();
+        pilha.pop();
+
+        for (int u : vetor_adj[v]){
+            if (!visitados[u]){
+                visitados[u] = true;
+                pai[u] = v;
+                pilha.push(u);
+            }
         }
     }
 }
