@@ -181,6 +181,7 @@ class Grafo {
 
         }
 
+        
         void exportar_arvore(const std::string& arquivo_output){
             std::ofstream arquivo(arquivo_output);
 
@@ -190,6 +191,16 @@ class Grafo {
             }
             arquivo.close();
 
+        }
+
+        void representar_arvore_gerada_bfs(const std::string& arquivo_saida, int vertice_inicial){
+            bfs(vertice_inicial);
+            exportar_arvore(arquivo_saida);
+        }
+
+        void representar_arvore_gerada_dfs(const std::string& arquivo_saida, int vertice_inicial){
+            dfs_iterativa(vertice_inicial);
+            exportar_arvore(arquivo_saida);
         }
 
         //Pega os graus de todos os vértices
@@ -328,16 +339,16 @@ class Grafo {
             }
 
             //A partir daqui é onde de fato imprimimos as informações necessárias
-            arquivo << "DADOS DO GRAFO \n";
-            arquivo << "Numero de Vertices:" << num_vertices << "\n";
-            arquivo << "Numero de Arestas" << num_vertices << "\n";
-            arquivo << "Grau Minimo" << grau_min << "\n";
-            arquivo << "Grau Maximo" << grau_max << "\n";
-            arquivo << "Grau Medio" << std::fixed << std::setprecision(2) << grau_medio << "\n";
-            arquivo << "Mediana de Grau" << mediana_grau << "\n\n";
+            arquivo << "Dados do grafo \n";
+            arquivo << "Numero de Vertices: " << num_vertices << "\n";
+            arquivo << "Numero de Arestas: " << num_arestas << "\n";
+            arquivo << "Grau Minimo: " << grau_min << "\n";
+            arquivo << "Grau Maximo: " << grau_max << "\n";
+            arquivo << "Grau Medio: " << std::fixed << std::setprecision(2) << grau_medio << "\n";
+            arquivo << "Mediana de Grau: " << mediana_grau << "\n\n";
 
             auto componentes_conexas = obter_componentes_conexas();
-            arquivo << "COMPONENTES CONEXAS:" << componentes_conexas.size() << "\n";
+            arquivo << "Componentes Conexas: " << componentes_conexas.size() << "\n";
             for (size_t i = 0; i < componentes_conexas.size(); ++i) {
                 arquivo << "Componente " << i + 1 << " - Tamanho: " << componentes_conexas[i].tamanho << "\n";
                 arquivo << "Vertices: ";
