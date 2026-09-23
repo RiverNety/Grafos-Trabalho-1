@@ -1,3 +1,5 @@
+
+como Lista
 Grafo 1:
 BFS:
   Media: 8327411.00 ns

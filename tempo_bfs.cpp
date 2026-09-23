@@ -1,11 +1,18 @@
 #include "grafos.cpp"
+#include <chrono>
 #include <iostream>
 
 int main(){
 
-    Grafo grafo(ModoDeRepresentacao::Lista);
-        grafo.ler_grafo("grafos analisados/grafo_5.txt");
+    Grafo grafo(ModoDeRepresentacao::Matriz);
+        grafo.ler_grafo("grafos analisados/grafo_2.txt");
         std::cout <<  "COMECOU" << "\n";
-        grafo.bfs(1);
+
+        auto inicio = std::chrono::high_resolution_clock::now();
+        grafo.dfs_iterativa(1);
+        auto fim = std::chrono::high_resolution_clock::now();
+
+        auto duracao = std::chrono::duration<double, std::nano>(fim - inicio);
+        std::cout << "Tempo da BFS: " << duracao.count() << " ns\n";
         std::cout <<  "ACABOU" << "\n";
 }
