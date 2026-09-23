@@ -1,0 +1,2 @@
+Grafo: grafo_4.txt
+Diametro aproximado: 5

@@ -1,0 +1,2 @@
+Grafo: grafo_3.txt
+Diametro aproximado: 22
