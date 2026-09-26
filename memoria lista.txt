@@ -1,6 +1,0 @@
-Grafo 1, 3.3 MB
-Grafo 2, 26.6 MB
-Grafo 3, 27.8 MB
-Grafo 4, 134.5 MB
-Grafo 5, 423.1 MB
-Grafo 6, 863.4 MB

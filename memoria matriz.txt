@@ -1,3 +1,0 @@
-Grafo 1, 13.5 MB
-Grafo 2, 312.5 MB
-Grafo 3, 5300 MB 8 GB de ram no pc, chegou a usar paginacao

@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <iomanip>
 
+// coloque os grafos em grafos analisados
+
 enum class ModoDeRepresentacao {
     Lista,
     Matriz
@@ -227,7 +229,7 @@ class Grafo {
         }
 
         //Faz o calculo do diametro exato
-        int calcular_diametro_exato(){
+        int calcular_diametro_exato(int vertice_inicial = 1){
             int max_distancia = 0;
             for(int i = 1; i <= num_vertices; ++i){
                 bfs(i);
