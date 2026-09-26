@@ -1,0 +1,49 @@
+
+como Lista
+Grafo 1:
+BFS:
+  Media: 8327411.00 ns
+  Desvio padrao: 7068204.18 ns
+DFS:
+  Media: 9466760.00 ns
+  Desvio padrao: 11888190.42 ns
+
+Grafo 2:
+BFS:
+  Media: 3268523.00 ns
+  Desvio padrao: 2827647.50 ns
+DFS:
+  Media: 3548798.00 ns
+  Desvio padrao: 2826237.01 ns
+
+Grafo 3:
+BFS:
+  Media: 158312963.00 ns
+  Desvio padrao: 207493377.45 ns
+DFS:
+  Media: 80553442.00 ns
+  Desvio padrao: 59311423.39 ns
+
+Grafo 4:
+BFS:
+  Media: 225152223.00 ns
+  Desvio padrao: 88888041.69 ns
+DFS:
+  Media: 215615034.00 ns
+  Desvio padrao: 57533306.04 ns
+
+Grafo 5:
+BFS:
+  Media: 1517377732.00 ns
+  Desvio padrao: 190784088.68 ns
+DFS:
+  Media: 1628355509.00 ns
+  Desvio padrao: 331702471.68 ns
+
+Grafo 6:
+BFS:
+  Media: 1062597805.00 ns
+  Desvio padrao: 197738748.42 ns
+DFS:
+  Media: 1042467875.00 ns
+  Desvio padrao: 83579658.48 ns
