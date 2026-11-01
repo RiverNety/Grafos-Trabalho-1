@@ -6,6 +6,8 @@
 #include <stack>
 #include <algorithm>
 #include <iomanip>
+#include <sstream>
+#include <utility>
 
 // coloque os grafos em grafos analisados
 
@@ -34,7 +36,7 @@ class Grafo {
 
         ModoDeRepresentacao modo;
 
-        std::vector<std::vector<int>> vetor_adj;
+        std::vector<std::vector<std::pair<int, float>>> vetor_adj;
         std::vector<std::vector<bool>> matriz_adj;
         std::vector<int> pai;
         std::vector<int> distancia;
@@ -61,7 +63,8 @@ class Grafo {
             for (int i = 1; i <= num_vertices; i++){
                 std::cout << i << " -> ";
                 for (int j = 0; j < vetor_adj[i].size(); j++){
-                    std::cout << vetor_adj[i][j] << " ";
+                    std::cout << "(" << vetor_adj[i][j].first << ", "
+                              << vetor_adj[i][j].second << ") ";
                 }
                 std::cout << std::endl;
             }
@@ -83,9 +86,10 @@ class Grafo {
 
             grafo_txt >> num_vertices;
             num_arestas = 0;
+            std::string linha;
 
             if(modo == ModoDeRepresentacao::Lista){
-                vetor_adj.assign(num_vertices + 1, std::vector<int>());
+                vetor_adj.assign(num_vertices + 1, std::vector<std::pair<int, float>>());
             }else{
                 matriz_adj.assign(num_vertices + 1, std::vector<bool>(num_vertices + 1, 0));
             }
@@ -93,15 +97,22 @@ class Grafo {
             pai.assign(num_vertices + 1, -1);
             distancia.resize(num_vertices + 1, -1);
 
-            int u, v;
-            while (grafo_txt >> u >> v){
+            while (std::getline(grafo_txt, linha)){
+                std::istringstream dados_aresta(linha);
+                int u, v;
+                if (!(dados_aresta >> u >> v)){
+                    continue;
+                    // dentro do if dados_aresta coloca os dados em u e v
+                }
+                float peso = 1.0f;
+                dados_aresta >> peso;
 
                 num_arestas ++;
 
                 //grafo nao direcionado
                 if(modo == ModoDeRepresentacao::Lista){
-                    vetor_adj[v].push_back(u);
-                    vetor_adj[u].push_back(v);
+                    vetor_adj[v].push_back({u, peso});
+                    vetor_adj[u].push_back({v, peso});
                 }else{
                     matriz_adj[u][v] = true;
                     matriz_adj[v][u] = true;
@@ -127,7 +138,8 @@ class Grafo {
                 pilha.pop();
 
                 if(modo == ModoDeRepresentacao::Lista){
-                    for (int u : vetor_adj[v]){
+                    for (const auto& aresta : vetor_adj[v]){
+                        int u = aresta.first;
                         if (distancia[u] == -1){
                             
                             distancia[u] = distancia[v] + 1;
@@ -163,7 +175,8 @@ class Grafo {
                 v = fila.front();
                 fila.pop();
                 if(modo == ModoDeRepresentacao::Lista){
-                    for (int u : vetor_adj[v]){
+                    for (const auto& aresta : vetor_adj[v]){
+                        int u = aresta.first;
                         if (distancia[u] == -1){
                             fila.push(u);
                             pai[u] = v;
@@ -296,7 +309,8 @@ class Grafo {
                         comp.vertices.push_back(u);
 
                         if (modo == ModoDeRepresentacao::Lista) {
-                            for (int v : vetor_adj[u]) {
+                            for (const auto& aresta : vetor_adj[u]) {
+                                int v = aresta.first;
                                 if (!visitado[v]) {
                                     visitado[v] = true;
                                     lista.push(v);
