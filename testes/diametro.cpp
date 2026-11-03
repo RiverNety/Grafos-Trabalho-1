@@ -1,5 +1,5 @@
 #include "grafos.cpp"
-#include<iostream>
+#include <iostream>
 
 int main() {
     Grafo grafo(ModoDeRepresentacao::Lista);

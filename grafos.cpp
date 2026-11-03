@@ -8,6 +8,8 @@
 #include <iomanip>
 #include <sstream>
 #include <utility>
+#include <limits>
+#include <functional>
 
 // coloque os grafos em grafos analisados
 
@@ -24,6 +26,50 @@ struct ComponenteConexa {
     //Refaz o que o operador < deve fazer quando se trata de structs
     bool operator<(const ComponenteConexa& outra) const {
         return tamanho > outra.tamanho;
+    }
+};
+
+// EntradaDijkstra é o elemento da fila ou heap
+using EntradaDijkstra = std::pair<float, int>;
+
+class FilaHeap {
+    std::priority_queue<EntradaDijkstra, std::vector<EntradaDijkstra>,
+                        std::greater<EntradaDijkstra>> dados;
+
+public:
+    void inserir(float distancia, int vertice){
+        dados.push({distancia, vertice});
+    }
+
+    EntradaDijkstra minimo(){
+        EntradaDijkstra menor = dados.top();
+        dados.pop();
+        return menor;
+    }
+
+    bool empty() const {
+        return dados.empty();
+    }
+};
+
+class FilaLista {
+    std::vector<EntradaDijkstra> dados;
+
+public:
+    void inserir(float distancia, int vertice){
+        dados.push_back({distancia, vertice});
+    }
+
+    EntradaDijkstra minimo(){
+        auto posicao = std::min_element(dados.begin(), dados.end());
+        EntradaDijkstra menor = *posicao;
+        // esse erase o(n)
+        dados.erase(posicao);
+        return menor;
+    }
+
+    bool empty() const {
+        return dados.empty();
     }
 };
 
@@ -107,6 +153,19 @@ class Grafo {
                 float peso = 1.0f;
                 dados_aresta >> peso;
 
+                if (peso < 0.0f){
+                    std::cout << "Erro, pesos negativos ainda não suportados." << std::endl;
+                    //reset
+
+                    num_vertices = 0;
+                    num_arestas = 0;
+                    vetor_adj.clear();
+                    matriz_adj.clear();
+                    pai.clear();
+                    distancia.clear();
+                    break;
+                }
+
                 num_arestas ++;
 
                 //grafo nao direcionado
@@ -162,8 +221,13 @@ class Grafo {
 
         void bfs(int v){
 
-            restart_distancia();
-            restart_pai();
+            distancia.assign(num_vertices + 1, -1);
+            pai.assign(num_vertices + 1, -1);
+
+            if (v < 1 || v > num_vertices){
+                std::cerr << "Erro: vertice inicial invalido para BFS." << std::endl;
+                return;
+            }
 
             std::queue<int> fila;
             fila.push(v);
@@ -178,17 +242,18 @@ class Grafo {
                     for (const auto& aresta : vetor_adj[v]){
                         int u = aresta.first;
                         if (distancia[u] == -1){
-                            fila.push(u);
+                            // arvore geradora
                             pai[u] = v;
                             distancia[u] = distancia[v] + 1;
+                            fila.push(u);
                         }
                     }
                 }else{
                     for (int u = 1; u <= num_vertices; u++){
                         if(matriz_adj[v][u] && distancia[u] == -1){
-                            fila.push(u);
                             pai[u] = v;
                             distancia[u] = distancia[v] + 1;
+                            fila.push(u);
                         }
                     }
                 }
@@ -218,7 +283,7 @@ class Grafo {
             exportar_arvore(arquivo_saida);
         }
 
-        //Pega os graus de todos os vértices
+        //graus de todos os vértices
         std::vector<int> obter_graus(){
             std::vector<int> graus(num_vertices + 1, 0);
             for (int i = 1; i <= num_vertices; ++i) {
@@ -239,6 +304,64 @@ class Grafo {
         int calcular_distancia(int u, int v){
             bfs(u);
             return distancia[v];
+        }
+
+        template<class TipoFila>
+        float djikstra(int origem, int destino = -1){
+            pai.assign(num_vertices + 1, -1);
+
+            //implementado apenas para lista
+            if (modo != ModoDeRepresentacao::Lista){
+                std::cerr << "Erro, djikstra implementado apenas para lista de adjacência.\n";
+                return -1.0f;
+            }
+
+            //vértice válido
+            if (origem < 1 || origem > num_vertices ||
+                (destino != -1 && (destino < 1 || destino > num_vertices))){
+                std::cerr << "Erro: vártice inválido.\n";
+                return -1.0f;
+            }
+
+            float infinito = std::numeric_limits<float>::infinity();
+            std::vector<float> dist(num_vertices + 1, infinito);
+            //abstração usando TipoFila, classes que implementam as 3 funções inserir, minimo e empty
+            TipoFila fila;
+            dist[origem] = 0.0f;
+            fila.inserir(0.0f, origem);
+
+            while (!fila.empty()){
+                auto entrada = fila.minimo();
+                float distancia_atual = entrada.first;
+                int atual = entrada.second;
+
+                //descarta caminhos maiores ate um vertice v
+                if (distancia_atual > dist[atual]){
+                    continue;
+                }
+
+                //ver vizinhos e atualizar distancias
+                for (auto& aresta : vetor_adj[atual]){
+                    int vizinho = aresta.first;
+                    float nova_distancia = distancia_atual + aresta.second;
+                    if (nova_distancia < dist[vizinho]){
+                        dist[vizinho] = nova_distancia;
+                        pai[vizinho] = atual;
+                        fila.inserir(nova_distancia, vizinho);
+                    }
+                }
+            }
+
+            if (destino == -1){
+                return 0.0f;
+            }
+
+            //nao há caminho
+            if (dist[destino] == infinito){
+                std::cout << "Não há caminho entre " << origem << " e " << destino << "\n";
+                return -1.0f;
+            }
+            return dist[destino];
         }
 
         //Faz o calculo do diametro exato
