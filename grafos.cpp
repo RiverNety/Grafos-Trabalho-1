@@ -85,7 +85,7 @@ class Grafo {
         std::vector<std::vector<std::pair<int, float>>> vetor_adj;
         std::vector<std::vector<bool>> matriz_adj;
         std::vector<int> pai;
-        std::vector<int> distancia;
+        std::vector<float> distancia;
 
         Grafo(ModoDeRepresentacao _modo){
             num_vertices = 0;
@@ -148,21 +148,20 @@ class Grafo {
                 int u, v;
                 if (!(dados_aresta >> u >> v)){
                     continue;
-                    // dentro do if dados_aresta coloca os dados em u e v
                 }
-                float peso = 1.0f;
-                dados_aresta >> peso;
-
+                float peso;
+                if (!(dados_aresta >> peso)){
+                    peso = 1.0f;
+                }   
                 if (peso < 0.0f){
                     std::cout << "Erro, pesos negativos ainda não suportados." << std::endl;
                     //reset
-
                     num_vertices = 0;
                     num_arestas = 0;
                     vetor_adj.clear();
                     matriz_adj.clear();
-                    pai.clear();
-                    distancia.clear();
+                    restart_pai();
+                    restart_distancia();
                     break;
                 }
 
@@ -324,10 +323,10 @@ class Grafo {
             }
 
             float infinito = std::numeric_limits<float>::infinity();
-            std::vector<float> dist(num_vertices + 1, infinito);
+            distancia.assign(num_vertices + 1, infinito);
             //abstração usando TipoFila, classes que implementam as 3 funções inserir, minimo e empty
             TipoFila fila;
-            dist[origem] = 0.0f;
+            distancia[origem] = 0.0f;
             fila.inserir(0.0f, origem);
 
             while (!fila.empty()){
@@ -335,8 +334,11 @@ class Grafo {
                 float distancia_atual = entrada.first;
                 int atual = entrada.second;
 
-                //descarta caminhos maiores ate um vertice v
-                if (distancia_atual > dist[atual]){
+                //descarta caminhos maiores até um vertice v, semelhante a sugestão do professor
+                //se o custo que eu estou vendo agora no topo da hea (minimo) eh maior que o que ja esta registrado
+                //nao precisa processar (continue), se for menor processa de novo
+                //quando um vertice sasi da heap ele ja tem distancia menor, por isso essa comparacao vale
+                if (distancia_atual > distancia[atual]){
                     continue;
                 }
 
@@ -344,8 +346,8 @@ class Grafo {
                 for (auto& aresta : vetor_adj[atual]){
                     int vizinho = aresta.first;
                     float nova_distancia = distancia_atual + aresta.second;
-                    if (nova_distancia < dist[vizinho]){
-                        dist[vizinho] = nova_distancia;
+                    if (nova_distancia < distancia[vizinho]){
+                        distancia[vizinho] = nova_distancia;
                         pai[vizinho] = atual;
                         fila.inserir(nova_distancia, vizinho);
                     }
@@ -357,11 +359,11 @@ class Grafo {
             }
 
             //nao há caminho
-            if (dist[destino] == infinito){
+            if (distancia[destino] == infinito){
                 std::cout << "Não há caminho entre " << origem << " e " << destino << "\n";
                 return -1.0f;
             }
-            return dist[destino];
+            return distancia[destino];
         }
 
         //Faz o calculo do diametro exato
