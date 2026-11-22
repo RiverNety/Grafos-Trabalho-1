@@ -10,6 +10,8 @@
 #include <utility>
 #include <limits>
 #include <functional>
+#include <random>
+#include <stdexcept>
 
 // coloque os grafos em grafos analisados
 
@@ -35,14 +37,17 @@ struct ComponenteConexa {
 };
 
 // EntradaDijkstra é o elemento da fila ou heap
-using EntradaDijkstra = std::pair<float, int>;
+using EntradaDijkstra = std::pair<double, int>;
 
 class FilaHeap {
     std::priority_queue<EntradaDijkstra, std::vector<EntradaDijkstra>,
                         std::greater<EntradaDijkstra>> dados;
 
 public:
-    void inserir(float distancia, int vertice){
+    //Construtor vazio
+    FilaHeap(int = 0){}
+
+    void inserir(double distancia, int vertice){
         dados.push({distancia, vertice});
     }
 
@@ -58,23 +63,36 @@ public:
 };
 
 class FilaLista {
-    std::vector<EntradaDijkstra> dados;
+    int n;
+    int abertos = 0;
+    std::vector<double> estimativa;
+    std::vector<bool> aberto;
 
 public:
-    void inserir(float distancia, int vertice){
-        dados.push_back({distancia, vertice});
+    FilaLista(int _n = 0) : n(_n), estimativa(_n + 1), aberto(_n + 1, false){}
+
+    void inserir(double distancia, int vertice){
+        if (!aberto[vertice]){
+            aberto[vertice] = true;
+            abertos++;
+        }
+        estimativa[vertice] = distancia;
     }
 
     EntradaDijkstra minimo(){
-        auto posicao = std::min_element(dados.begin(), dados.end());
-        EntradaDijkstra menor = *posicao;
-        // esse erase o(n)
-        dados.erase(posicao);
-        return menor;
+        int melhor = -1;
+        for (int v = 1; v <= n; v++){
+            if (aberto[v] && (melhor == -1 || estimativa[v] < estimativa[melhor])){
+                melhor = v;
+            }
+        }
+        aberto[melhor] = false;
+        abertos--;
+        return {estimativa[melhor], melhor};
     }
 
     bool empty() const {
-        return dados.empty();
+        return abertos == 0;
     }
 };
 
@@ -89,10 +107,13 @@ class Grafo {
         ModoDeRepresentacao modo;
         Direcionamento direcionamento;
 
-        std::vector<std::vector<std::pair<int, float>>> vetor_adj;
+        std::vector<std::vector<std::pair<int, double>>> vetor_adj;
+        std::vector<std::vector<std::pair<int, double>>> vetor_adj_t;
         std::vector<std::vector<bool>> matriz_adj;
         std::vector<int> pai;
-        std::vector<float> distancia;
+        std::vector<double> distancia;
+        std::vector<std::vector<double>> dist_fw;
+        std::vector<std::vector<int>> pai_fw;
 
         Grafo(ModoDeRepresentacao _modo, Direcionamento _direcionamento = Direcionamento::ndir){
             num_vertices = 0;
@@ -138,20 +159,24 @@ class Grafo {
         //reinicia quando le um arquivo novo
         void ler_grafo(const std::string& arquivo){
             std::ifstream grafo_txt(arquivo);
+            if (!grafo_txt){
+                throw std::runtime_error("nao foi possivel abrir " + arquivo);
+            }
 
             grafo_txt >> num_vertices;
             num_arestas = 0;
             tem_pesos_negativos = false;
             std::string linha;
 
+            vetor_adj_t.clear();
             if(modo == ModoDeRepresentacao::Lista){
-                vetor_adj.assign(num_vertices + 1, std::vector<std::pair<int, float>>());
+                vetor_adj.assign(num_vertices + 1, std::vector<std::pair<int, double>>());
             }else{
                 matriz_adj.assign(num_vertices + 1, std::vector<bool>(num_vertices + 1, 0));
             }
             
             pai.assign(num_vertices + 1, -1);
-            distancia.resize(num_vertices + 1, -1);
+            distancia.assign(num_vertices + 1, -1);
 
             while (std::getline(grafo_txt, linha)){
                 std::istringstream dados_aresta(linha);
@@ -159,11 +184,14 @@ class Grafo {
                 if (!(dados_aresta >> u >> v)){
                     continue;
                 }
-                float peso;
+                if (u < 1 || u > num_vertices || v < 1 || v > num_vertices){
+                    throw std::runtime_error("vertice fora do intervalo em " + arquivo);
+                }
+                double peso;
                 if (!(dados_aresta >> peso)){
-                    peso = 1.0f;
+                    peso = 1.0;
                 }   
-                if (peso < 0.0f){
+                if (peso < 0.0){
                     tem_pesos_negativos = true;
                 }
                 num_arestas ++;
@@ -185,39 +213,51 @@ class Grafo {
 
         }
 
+        void construir_transposto(){
+            if (modo != ModoDeRepresentacao::Lista || direcionamento == Direcionamento::ndir){
+                return;
+            }
+            if ((int)vetor_adj_t.size() == num_vertices + 1){
+                return;
+            }
+            vetor_adj_t.assign(num_vertices + 1, std::vector<std::pair<int, double>>());
+            for (int u = 1; u <= num_vertices; u++){
+                for (const auto& aresta : vetor_adj[u]){
+                    vetor_adj_t[aresta.first].push_back({u, aresta.second});
+                }
+            }
+        }
+
         //dfs iterativa
-        void dfs_iterativa(int v){
+        void dfs_iterativa(int origem){
             
             restart_pai();
             restart_distancia();
 
-            std::stack<int> pilha;
-
-            pilha.push(v);
-            distancia[v] = 0;
-            pai[v] = -1;
+            std::stack<std::pair<int, int>> pilha;
+            pilha.push({origem, -1});
 
             while (!pilha.empty()){
-                v = pilha.top();
+                int v = pilha.top().first;
+                int p = pilha.top().second;
                 pilha.pop();
 
+                if (distancia[v] != -1){
+                    continue;
+                }
+                pai[v] = p;
+                distancia[v] = (p == -1) ? 0 : distancia[p] + 1;
+
                 if(modo == ModoDeRepresentacao::Lista){
-                    for (const auto& aresta : vetor_adj[v]){
-                        int u = aresta.first;
-                        if (distancia[u] == -1){
-                            
-                            distancia[u] = distancia[v] + 1;
-                            pai[u] = v;
-                            pilha.push(u);
+                    for (auto it = vetor_adj[v].rbegin(); it != vetor_adj[v].rend(); ++it){
+                        if (distancia[it->first] == -1){
+                            pilha.push({it->first, v});
                         }
                     }
                 } else {
                     for (int u = num_vertices; u >= 1; u --){
-
                         if(matriz_adj[v][u] && distancia[u] == -1){
-                            distancia[u] = distancia[v] + 1;
-                            pai[u] = v;
-                            pilha.push(u);
+                            pilha.push({u, v});
                         }
                     }
                 }
@@ -311,7 +351,30 @@ class Grafo {
             return distancia[v];
         }
 
-        bool bellman_ford(int origem){
+        std::vector<int> caminho_ate(int v){
+            std::vector<int> caminho;
+            if (distancia[v] == std::numeric_limits<double>::infinity()){
+                return caminho;
+            }
+            for (int x = v; x != -1; x = pai[x]){
+                caminho.push_back(x);
+            }
+            std::reverse(caminho.begin(), caminho.end());
+            return caminho;
+        }
+
+        std::vector<int> caminho_para_destino(int v){
+            std::vector<int> caminho;
+            if (distancia[v] == std::numeric_limits<double>::infinity()){
+                return caminho;
+            }
+            for (int x = v; x != -1; x = pai[x]){
+                caminho.push_back(x);
+            }
+            return caminho;
+        }
+
+        bool bellman_ford_em(const std::vector<std::vector<std::pair<int, double>>>& adj, int origem){
             if (modo != ModoDeRepresentacao::Lista){
                 std::cerr << "Erro, bellman_ford apenas para lista de adjacência.\n";
                 return false;
@@ -322,7 +385,7 @@ class Grafo {
                 return false;
             }
 
-            float infinito = std::numeric_limits<float>::infinity();
+            double infinito = std::numeric_limits<double>::infinity();
             distancia.assign(num_vertices + 1, infinito);
             pai.assign(num_vertices + 1, -1);
             distancia[origem] = 0.0f;
@@ -334,7 +397,7 @@ class Grafo {
                 std::vector<int> proximos; // quem vai ser atualizado na proxima iteracao, temporario para cada passo do loop
 
                 for (int u : atualizados){
-                    for (const auto& aresta : vetor_adj[u]){
+                    for (const auto& aresta : adj[u]){
                         int v = aresta.first;
                         if (distancia[u] + aresta.second < distancia[v]){
                             distancia[v] = distancia[u] + aresta.second;
@@ -365,38 +428,114 @@ class Grafo {
             return true;
         }
 
+        bool bellman_ford(int origem){
+            return bellman_ford_em(vetor_adj, origem);
+        }
+
+        bool bellman_ford_para_destino(int destino){
+            construir_transposto();
+            if (direcionamento == Direcionamento::dir){
+                return bellman_ford_em(vetor_adj_t, destino);
+            }
+            return bellman_ford_em(vetor_adj, destino);
+        }
+
+        bool floyd_warshall(){
+            if (modo != ModoDeRepresentacao::Lista){
+                std::cerr << "Erro, floyd_warshall apenas para lista de adjacência.\n";
+                return false;
+            }
+
+            double infinito = std::numeric_limits<double>::infinity();
+            dist_fw.assign(num_vertices + 1, std::vector<double>(num_vertices + 1, infinito));
+            pai_fw.assign(num_vertices + 1, std::vector<int>(num_vertices + 1, -1));
+
+            for (int u = 1; u <= num_vertices; u++){
+                dist_fw[u][u] = 0.0;
+            }
+            for (int u = 1; u <= num_vertices; u++){
+                for (const auto& aresta : vetor_adj[u]){
+                    int v = aresta.first;
+                    if (aresta.second < dist_fw[u][v]){
+                        dist_fw[u][v] = aresta.second;
+                        pai_fw[u][v] = u;
+                    }
+                }
+            }
+
+            for (int i = 1; i <= num_vertices; i++){
+                if (dist_fw[i][i] < 0){
+                    return false;
+                }
+            }
+
+            for (int k = 1; k <= num_vertices; k++){
+                for (int i = 1; i <= num_vertices; i++){
+                    if (dist_fw[i][k] == infinito){
+                        continue;
+                    }
+                    for (int j = 1; j <= num_vertices; j++){
+                        double nova = dist_fw[i][k] + dist_fw[k][j];
+                        if (nova < dist_fw[i][j]){
+                            dist_fw[i][j] = nova;
+                            pai_fw[i][j] = pai_fw[k][j];
+                        }
+                    }
+                }
+                for (int i = 1; i <= num_vertices; i++){
+                    if (dist_fw[i][i] < 0){
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        std::vector<int> caminho_fw(int i, int j){
+            std::vector<int> caminho;
+            if (dist_fw[i][j] == std::numeric_limits<double>::infinity()){
+                return caminho;
+            }
+            for (int x = j; x != i; x = pai_fw[i][x]){
+                caminho.push_back(x);
+            }
+            caminho.push_back(i);
+            std::reverse(caminho.begin(), caminho.end());
+            return caminho;
+        }
+
         template<class TipoFila>
-        float djikstra(int origem, int destino = -1){
+        double djikstra(int origem, int destino = -1){
             pai.assign(num_vertices + 1, -1);
 
             //implementado apenas para lista
             if (modo != ModoDeRepresentacao::Lista){
                 std::cerr << "Erro, djikstra implementado apenas para lista de adjacência.\n";
-                return -1.0f;
+                return -1.0;
             }
 
             if (tem_pesos_negativos){
                 std::cerr << "Erro, djikstra não suporta pesos negativos.\n";
-                return -1.0f;
+                return -1.0;
             }
 
             //vértice válido
             if (origem < 1 || origem > num_vertices ||
                 (destino != -1 && (destino < 1 || destino > num_vertices))){
                 std::cerr << "Erro: vártice inválido.\n";
-                return -1.0f;
+                return -1.0;
             }
 
-            float infinito = std::numeric_limits<float>::infinity();
+            double infinito = std::numeric_limits<double>::infinity();
             distancia.assign(num_vertices + 1, infinito);
             //abstração usando TipoFila, classes que implementam as 3 funções inserir, minimo e empty
-            TipoFila fila;
-            distancia[origem] = 0.0f;
-            fila.inserir(0.0f, origem);
+            TipoFila fila(num_vertices);
+            distancia[origem] = 0.0;
+            fila.inserir(0.0, origem);
 
             while (!fila.empty()){
                 auto entrada = fila.minimo();
-                float distancia_atual = entrada.first;
+                double distancia_atual = entrada.first;
                 int atual = entrada.second;
 
                 //descarta caminhos maiores até um vertice v, semelhante a sugestão do professor
@@ -410,7 +549,7 @@ class Grafo {
                 //ver vizinhos e atualizar distancias
                 for (auto& aresta : vetor_adj[atual]){
                     int vizinho = aresta.first;
-                    float nova_distancia = distancia_atual + aresta.second;
+                    double nova_distancia = distancia_atual + aresta.second;
                     if (nova_distancia < distancia[vizinho]){
                         distancia[vizinho] = nova_distancia;
                         pai[vizinho] = atual;
@@ -420,19 +559,19 @@ class Grafo {
             }
 
             if (destino == -1){
-                return 0.0f;
+                return 0.0;
             }
 
             //nao há caminho
             if (distancia[destino] == infinito){
                 std::cout << "Não há caminho entre " << origem << " e " << destino << "\n";
-                return -1.0f;
+                return -1.0;
             }
             return distancia[destino];
         }
 
         //Faz o calculo do diametro exato
-        int calcular_diametro_exato(int vertice_inicial = 1){
+        int calcular_diametro_exato(){
             int max_distancia = 0;
             for(int i = 1; i <= num_vertices; ++i){
                 bfs(i);
@@ -448,26 +587,30 @@ class Grafo {
 
         //Faz um calculo aproximado do diametro usando o algoritmo de Duplo Sweep
         int calcular_diametro_aproximado(int quantidade = 10){
+            std::mt19937 gerador(42);
+            std::uniform_int_distribution<int> sorteio(1, num_vertices);
             int max_distancia = 0;
-            for(int s = 1; s <= std::min(num_vertices, quantidade); ++s){
-                bfs(s);
+            for(int t = 0; t < quantidade; ++t){
+                int s = sorteio(gerador);
+                int anterior = -1;
+                while (true){
+                    bfs(s);
 
-                int vertice_mais_distante = 0;
-                int max_d_local = 0;
-                for(int i = 1; i <= num_vertices; ++i){
-                    if(distancia[i] > max_d_local) {
-                        max_d_local = distancia[i];
-                        vertice_mais_distante = i;
+                    int vertice_mais_distante = s;
+                    int max_d_local = 0;
+                    for(int i = 1; i <= num_vertices; ++i){
+                        if(distancia[i] > max_d_local) {
+                            max_d_local = distancia[i];
+                            vertice_mais_distante = i;
+                        }
                     }
-                }
-
-                //Faz outra BFS num nó ainda mais distante
-                bfs(vertice_mais_distante);
-                for(int i = 1; i <= num_vertices; ++i){
-                    if(distancia[i] > max_distancia){
-                        max_distancia = distancia[i];
+                    if (max_d_local <= anterior){
+                        break;
                     }
+                    anterior = max_d_local;
+                    s = vertice_mais_distante;
                 }
+                max_distancia = std::max(max_distancia, anterior);
             }
             return max_distancia;
         }
@@ -480,6 +623,9 @@ class Grafo {
         }
 
         std::vector<ComponenteConexa> obter_componentes_conexas(){
+            bool dir = (direcionamento == Direcionamento::dir);
+            if (dir) construir_transposto();
+
             std::vector<bool> visitado(num_vertices + 1, false);
             std::vector<ComponenteConexa> componentes;
             int comp_id = 1;
@@ -506,9 +652,18 @@ class Grafo {
                                     lista.push(v);
                                 }
                             }
+                            if (dir) {
+                                for (const auto& aresta : vetor_adj_t[u]) {
+                                    int v = aresta.first;
+                                    if (!visitado[v]) {
+                                        visitado[v] = true;
+                                        lista.push(v);
+                                    }
+                                }
+                            }
                         } else {
                             for (int v = 1; v <= num_vertices; ++v) {
-                                if (matriz_adj[u][v] && !visitado[v]) {
+                                if ((matriz_adj[u][v] || (dir && matriz_adj[v][u])) && !visitado[v]) {
                                     visitado[v] = true;
                                     lista.push(v);
                                 }
@@ -534,7 +689,8 @@ class Grafo {
             int grau_min = graus_validos.front();
             int grau_max = graus_validos.back();
 
-            double grau_medio = (2.0 * num_arestas) / static_cast<double>(num_vertices);
+            double fator = (direcionamento == Direcionamento::dir) ? 1.0 : 2.0;
+            double grau_medio = (fator * num_arestas) / static_cast<double>(num_vertices);
             
             double mediana_grau;
             int n = graus_validos.size();
