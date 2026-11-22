@@ -84,6 +84,7 @@ class Grafo {
 
         int num_vertices;
         int num_arestas;
+        bool tem_pesos_negativos;
 
         ModoDeRepresentacao modo;
         Direcionamento direcionamento;
@@ -96,6 +97,7 @@ class Grafo {
         Grafo(ModoDeRepresentacao _modo, Direcionamento _direcionamento = Direcionamento::ndir){
             num_vertices = 0;
             num_arestas = 0;
+            tem_pesos_negativos = false;
             modo = _modo;
             direcionamento = _direcionamento;
         }
@@ -139,6 +141,7 @@ class Grafo {
 
             grafo_txt >> num_vertices;
             num_arestas = 0;
+            tem_pesos_negativos = false;
             std::string linha;
 
             if(modo == ModoDeRepresentacao::Lista){
@@ -161,17 +164,8 @@ class Grafo {
                     peso = 1.0f;
                 }   
                 if (peso < 0.0f){
-                    std::cout << "Erro, pesos negativos ainda não suportados." << std::endl;
-                    //reset
-                    num_vertices = 0;
-                    num_arestas = 0;
-                    vetor_adj.clear();
-                    matriz_adj.clear();
-                    restart_pai();
-                    restart_distancia();
-                    break;
+                    tem_pesos_negativos = true;
                 }
-
                 num_arestas ++;
 
                 if(modo == ModoDeRepresentacao::Lista){
@@ -317,6 +311,60 @@ class Grafo {
             return distancia[v];
         }
 
+        bool bellman_ford(int origem){
+            if (modo != ModoDeRepresentacao::Lista){
+                std::cerr << "Erro, bellman_ford apenas para lista de adjacência.\n";
+                return false;
+            }
+
+            if (origem < 1 || origem > num_vertices){
+                std::cerr << "Erro: vértice de origem inválido para Bellman-Ford.\n";
+                return false;
+            }
+
+            float infinito = std::numeric_limits<float>::infinity();
+            distancia.assign(num_vertices + 1, infinito);
+            pai.assign(num_vertices + 1, -1);
+            distancia[origem] = 0.0f;
+
+            std::vector<int> atualizados(1, origem); //começa com a origem (atualizada pra 0)
+            std::vector<bool> adicionado(num_vertices + 1, false);
+
+            for (int i = 0; i < num_vertices; ++i){
+                std::vector<int> proximos; // quem vai ser atualizado na proxima iteracao, temporario para cada passo do loop
+
+                for (int u : atualizados){
+                    for (const auto& aresta : vetor_adj[u]){
+                        int v = aresta.first;
+                        if (distancia[u] + aresta.second < distancia[v]){
+                            distancia[v] = distancia[u] + aresta.second;
+                            pai[v] = u;
+                            if (!adicionado[v]){
+                                proximos.push_back(v); //não adicionar o vértice mais de uma vez
+                                adicionado[v] = true;
+                            }
+                        }
+                    }
+                }
+
+                for (int v : proximos){
+                    adicionado[v] = false;
+                }
+
+                if (proximos.empty()){
+                    return true;
+                }
+                if (i == num_vertices - 1){
+                    std::cerr << "Erro: ciclo negativo alcancável a partir da origem.\n";
+                    return false;
+                }
+
+                atualizados.swap(proximos);
+            }
+
+            return true;
+        }
+
         template<class TipoFila>
         float djikstra(int origem, int destino = -1){
             pai.assign(num_vertices + 1, -1);
@@ -324,6 +372,11 @@ class Grafo {
             //implementado apenas para lista
             if (modo != ModoDeRepresentacao::Lista){
                 std::cerr << "Erro, djikstra implementado apenas para lista de adjacência.\n";
+                return -1.0f;
+            }
+
+            if (tem_pesos_negativos){
+                std::cerr << "Erro, djikstra não suporta pesos negativos.\n";
                 return -1.0f;
             }
 
