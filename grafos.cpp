@@ -18,6 +18,11 @@ enum class ModoDeRepresentacao {
     Matriz
 };
 
+enum class Direcionamento {
+    dir,
+    ndir
+};
+
 struct ComponenteConexa {
     int id;
     int tamanho;
@@ -81,16 +86,18 @@ class Grafo {
         int num_arestas;
 
         ModoDeRepresentacao modo;
+        Direcionamento direcionamento;
 
         std::vector<std::vector<std::pair<int, float>>> vetor_adj;
         std::vector<std::vector<bool>> matriz_adj;
         std::vector<int> pai;
         std::vector<float> distancia;
 
-        Grafo(ModoDeRepresentacao _modo){
+        Grafo(ModoDeRepresentacao _modo, Direcionamento _direcionamento = Direcionamento::ndir){
             num_vertices = 0;
             num_arestas = 0;
             modo = _modo;
+            direcionamento = _direcionamento;
         }
         
         void restart_distancia(){
@@ -167,13 +174,18 @@ class Grafo {
 
                 num_arestas ++;
 
-                //grafo nao direcionado
                 if(modo == ModoDeRepresentacao::Lista){
-                    vetor_adj[v].push_back({u, peso});
-                    vetor_adj[u].push_back({v, peso});
+                    if (direcionamento == Direcionamento::dir) {
+                        vetor_adj[u].push_back({v, peso});
+                    } else {
+                        vetor_adj[v].push_back({u, peso});
+                        vetor_adj[u].push_back({v, peso});
+                    }
                 }else{
                     matriz_adj[u][v] = true;
-                    matriz_adj[v][u] = true;
+                    if (direcionamento == Direcionamento::ndir) {
+                        matriz_adj[v][u] = true;
+                    }
                 }
             }
 
